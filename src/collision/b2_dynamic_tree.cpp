@@ -107,14 +107,12 @@ void b2DynamicTree::FreeNode(int32 nodeId)
 // Create a proxy in the tree as a leaf node. We return the index
 // of the node instead of a pointer so that we can grow
 // the node pool.
-int32 b2DynamicTree::CreateProxy(const b2AABB& aabb, void* userData)
+int32 b2DynamicTree::CreateProxy(const Rectf& aabb, void* userData)
 {
 	int32 proxyId = AllocateNode();
 
 	// Fatten the aabb.
-	b2Vec2 r(b2_aabbExtension, b2_aabbExtension);
-	m_nodes[proxyId].aabb.lowerBound = aabb.lowerBound - r;
-	m_nodes[proxyId].aabb.upperBound = aabb.upperBound + r;
+	m_nodes[proxyId].aabb = aabb.grown(b2_aabbExtension);
 	m_nodes[proxyId].userData = userData;
 	m_nodes[proxyId].height = 0;
 	m_nodes[proxyId].moved = true;
@@ -133,50 +131,45 @@ void b2DynamicTree::DestroyProxy(int32 proxyId)
 	FreeNode(proxyId);
 }
 
-bool b2DynamicTree::MoveProxy(int32 proxyId, const b2AABB& aabb, const b2Vec2& displacement)
+bool b2DynamicTree::MoveProxy(int32 proxyId, const Rectf& aabb, const Vector& displacement)
 {
 	b2Assert(0 <= proxyId && proxyId < m_nodeCapacity);
 
 	b2Assert(m_nodes[proxyId].IsLeaf());
 
 	// Extend AABB
-	b2AABB fatAABB;
-	b2Vec2 r(b2_aabbExtension, b2_aabbExtension);
-	fatAABB.lowerBound = aabb.lowerBound - r;
-	fatAABB.upperBound = aabb.upperBound + r;
+	Rectf fatAABB = aabb.grown(b2_aabbExtension);
 
 	// Predict AABB movement
-	b2Vec2 d = b2_aabbMultiplier * displacement;
+	Vector d = b2_aabbMultiplier * displacement;
 
 	if (d.x < 0.0f)
 	{
-		fatAABB.lowerBound.x += d.x;
+		fatAABB.get_left() += d.x;
 	}
 	else
 	{
-		fatAABB.upperBound.x += d.x;
+		fatAABB.get_right() += d.x;
 	}
 
 	if (d.y < 0.0f)
 	{
-		fatAABB.lowerBound.y += d.y;
+		fatAABB.get_top() += d.y;
 	}
 	else
 	{
-		fatAABB.upperBound.y += d.y;
+		fatAABB.get_bottom() += d.y;
 	}
 
-	const b2AABB& treeAABB = m_nodes[proxyId].aabb;
-	if (treeAABB.Contains(aabb))
+	const Rectf& treeAABB = m_nodes[proxyId].aabb;
+	if (treeAABB.contains(aabb))
 	{
 		// The tree AABB still contains the object, but it might be too large.
 		// Perhaps the object was moving fast but has since gone to sleep.
 		// The huge AABB is larger than the new fat AABB.
-		b2AABB hugeAABB;
-		hugeAABB.lowerBound = fatAABB.lowerBound - 4.0f * r;
-		hugeAABB.upperBound = fatAABB.upperBound + 4.0f * r;
+		Rectf hugeAABB = fatAABB.grown(4.0f * b2_aabbExtension);
 
-		if (hugeAABB.Contains(treeAABB))
+		if (hugeAABB.contains(treeAABB))
 		{
 			// The tree AABB contains the object AABB and the tree AABB is
 			// not too large. No tree update needed.
@@ -209,18 +202,18 @@ void b2DynamicTree::InsertLeaf(int32 leaf)
 	}
 
 	// Find the best sibling for this node
-	b2AABB leafAABB = m_nodes[leaf].aabb;
+	Rectf leafAABB = m_nodes[leaf].aabb;
 	int32 index = m_root;
 	while (m_nodes[index].IsLeaf() == false)
 	{
 		int32 child1 = m_nodes[index].child1;
 		int32 child2 = m_nodes[index].child2;
 
-		float area = m_nodes[index].aabb.GetPerimeter();
+		float area = m_nodes[index].aabb.get_perimeter();
 
-		b2AABB combinedAABB;
-		combinedAABB.Combine(m_nodes[index].aabb, leafAABB);
-		float combinedArea = combinedAABB.GetPerimeter();
+		Rectf combinedAABB;
+		combinedAABB.combine(m_nodes[index].aabb, leafAABB);
+		float combinedArea = combinedAABB.get_perimeter();
 
 		// Cost of creating a new parent for this node and the new leaf
 		float cost = 2.0f * combinedArea;
@@ -232,16 +225,16 @@ void b2DynamicTree::InsertLeaf(int32 leaf)
 		float cost1;
 		if (m_nodes[child1].IsLeaf())
 		{
-			b2AABB aabb;
-			aabb.Combine(leafAABB, m_nodes[child1].aabb);
-			cost1 = aabb.GetPerimeter() + inheritanceCost;
+			Rectf aabb;
+			aabb.combine(leafAABB, m_nodes[child1].aabb);
+			cost1 = aabb.get_perimeter() + inheritanceCost;
 		}
 		else
 		{
-			b2AABB aabb;
-			aabb.Combine(leafAABB, m_nodes[child1].aabb);
-			float oldArea = m_nodes[child1].aabb.GetPerimeter();
-			float newArea = aabb.GetPerimeter();
+			Rectf aabb;
+			aabb.combine(leafAABB, m_nodes[child1].aabb);
+			float oldArea = m_nodes[child1].aabb.get_perimeter();
+			float newArea = aabb.get_perimeter();
 			cost1 = (newArea - oldArea) + inheritanceCost;
 		}
 
@@ -249,16 +242,16 @@ void b2DynamicTree::InsertLeaf(int32 leaf)
 		float cost2;
 		if (m_nodes[child2].IsLeaf())
 		{
-			b2AABB aabb;
-			aabb.Combine(leafAABB, m_nodes[child2].aabb);
-			cost2 = aabb.GetPerimeter() + inheritanceCost;
+			Rectf aabb;
+			aabb.combine(leafAABB, m_nodes[child2].aabb);
+			cost2 = aabb.get_perimeter() + inheritanceCost;
 		}
 		else
 		{
-			b2AABB aabb;
-			aabb.Combine(leafAABB, m_nodes[child2].aabb);
-			float oldArea = m_nodes[child2].aabb.GetPerimeter();
-			float newArea = aabb.GetPerimeter();
+			Rectf aabb;
+			aabb.combine(leafAABB, m_nodes[child2].aabb);
+			float oldArea = m_nodes[child2].aabb.get_perimeter();
+			float newArea = aabb.get_perimeter();
 			cost2 = newArea - oldArea + inheritanceCost;
 		}
 
@@ -286,7 +279,7 @@ void b2DynamicTree::InsertLeaf(int32 leaf)
 	int32 newParent = AllocateNode();
 	m_nodes[newParent].parent = oldParent;
 	m_nodes[newParent].userData = nullptr;
-	m_nodes[newParent].aabb.Combine(leafAABB, m_nodes[sibling].aabb);
+	m_nodes[newParent].aabb.combine(leafAABB, m_nodes[sibling].aabb);
 	m_nodes[newParent].height = m_nodes[sibling].height + 1;
 
 	if (oldParent != b2_nullNode)
@@ -328,8 +321,8 @@ void b2DynamicTree::InsertLeaf(int32 leaf)
 		b2Assert(child1 != b2_nullNode);
 		b2Assert(child2 != b2_nullNode);
 
-		m_nodes[index].height = 1 + b2Max(m_nodes[child1].height, m_nodes[child2].height);
-		m_nodes[index].aabb.Combine(m_nodes[child1].aabb, m_nodes[child2].aabb);
+		m_nodes[index].height = 1 + std::max(m_nodes[child1].height, m_nodes[child2].height);
+		m_nodes[index].aabb.combine(m_nodes[child1].aabb, m_nodes[child2].aabb);
 
 		index = m_nodes[index].parent;
 	}
@@ -380,8 +373,8 @@ void b2DynamicTree::RemoveLeaf(int32 leaf)
 			int32 child1 = m_nodes[index].child1;
 			int32 child2 = m_nodes[index].child2;
 
-			m_nodes[index].aabb.Combine(m_nodes[child1].aabb, m_nodes[child2].aabb);
-			m_nodes[index].height = 1 + b2Max(m_nodes[child1].height, m_nodes[child2].height);
+			m_nodes[index].aabb.combine(m_nodes[child1].aabb, m_nodes[child2].aabb);
+			m_nodes[index].height = 1 + std::max(m_nodes[child1].height, m_nodes[child2].height);
 
 			index = m_nodes[index].parent;
 		}
@@ -457,22 +450,22 @@ int32 b2DynamicTree::Balance(int32 iA)
 			C->child2 = iF;
 			A->child2 = iG;
 			G->parent = iA;
-			A->aabb.Combine(B->aabb, G->aabb);
-			C->aabb.Combine(A->aabb, F->aabb);
+			A->aabb.combine(B->aabb, G->aabb);
+			C->aabb.combine(A->aabb, F->aabb);
 
-			A->height = 1 + b2Max(B->height, G->height);
-			C->height = 1 + b2Max(A->height, F->height);
+			A->height = 1 + std::max(B->height, G->height);
+			C->height = 1 + std::max(A->height, F->height);
 		}
 		else
 		{
 			C->child2 = iG;
 			A->child2 = iF;
 			F->parent = iA;
-			A->aabb.Combine(B->aabb, F->aabb);
-			C->aabb.Combine(A->aabb, G->aabb);
+			A->aabb.combine(B->aabb, F->aabb);
+			C->aabb.combine(A->aabb, G->aabb);
 
-			A->height = 1 + b2Max(B->height, F->height);
-			C->height = 1 + b2Max(A->height, G->height);
+			A->height = 1 + std::max(B->height, F->height);
+			C->height = 1 + std::max(A->height, G->height);
 		}
 
 		return iC;
@@ -517,22 +510,22 @@ int32 b2DynamicTree::Balance(int32 iA)
 			B->child2 = iD;
 			A->child1 = iE;
 			E->parent = iA;
-			A->aabb.Combine(C->aabb, E->aabb);
-			B->aabb.Combine(A->aabb, D->aabb);
+			A->aabb.combine(C->aabb, E->aabb);
+			B->aabb.combine(A->aabb, D->aabb);
 
-			A->height = 1 + b2Max(C->height, E->height);
-			B->height = 1 + b2Max(A->height, D->height);
+			A->height = 1 + std::max(C->height, E->height);
+			B->height = 1 + std::max(A->height, D->height);
 		}
 		else
 		{
 			B->child2 = iE;
 			A->child1 = iD;
 			D->parent = iA;
-			A->aabb.Combine(C->aabb, D->aabb);
-			B->aabb.Combine(A->aabb, E->aabb);
+			A->aabb.combine(C->aabb, D->aabb);
+			B->aabb.combine(A->aabb, E->aabb);
 
-			A->height = 1 + b2Max(C->height, D->height);
-			B->height = 1 + b2Max(A->height, E->height);
+			A->height = 1 + std::max(C->height, D->height);
+			B->height = 1 + std::max(A->height, E->height);
 		}
 
 		return iB;
@@ -560,7 +553,7 @@ float b2DynamicTree::GetAreaRatio() const
 	}
 
 	const b2TreeNode* root = m_nodes + m_root;
-	float rootArea = root->aabb.GetPerimeter();
+	float rootArea = root->aabb.get_perimeter();
 
 	float totalArea = 0.0f;
 	for (int32 i = 0; i < m_nodeCapacity; ++i)
@@ -572,7 +565,7 @@ float b2DynamicTree::GetAreaRatio() const
 			continue;
 		}
 
-		totalArea += node->aabb.GetPerimeter();
+		totalArea += node->aabb.get_perimeter();
 	}
 
 	return totalArea / rootArea;
@@ -591,7 +584,7 @@ int32 b2DynamicTree::ComputeHeight(int32 nodeId) const
 
 	int32 height1 = ComputeHeight(node->child1);
 	int32 height2 = ComputeHeight(node->child2);
-	return 1 + b2Max(height1, height2);
+	return 1 + std::max(height1, height2);
 }
 
 int32 b2DynamicTree::ComputeHeight() const
@@ -661,14 +654,13 @@ void b2DynamicTree::ValidateMetrics(int32 index) const
 	int32 height1 = m_nodes[child1].height;
 	int32 height2 = m_nodes[child2].height;
 	int32 height;
-	height = 1 + b2Max(height1, height2);
+	height = 1 + std::max(height1, height2);
 	b2Assert(node->height == height);
 
-	b2AABB aabb;
-	aabb.Combine(m_nodes[child1].aabb, m_nodes[child2].aabb);
+	Rectf aabb;
+	aabb.combine(m_nodes[child1].aabb, m_nodes[child2].aabb);
 
-	b2Assert(aabb.lowerBound == node->aabb.lowerBound);
-	b2Assert(aabb.upperBound == node->aabb.upperBound);
+	b2Assert(aabb == node->aabb);
 
 	ValidateMetrics(child1);
 	ValidateMetrics(child2);
@@ -711,7 +703,7 @@ int32 b2DynamicTree::GetMaxBalance() const
 		int32 child1 = node->child1;
 		int32 child2 = node->child2;
 		int32 balance = b2Abs(m_nodes[child2].height - m_nodes[child1].height);
-		maxBalance = b2Max(maxBalance, balance);
+		maxBalance = std::max(maxBalance, balance);
 	}
 
 	return maxBalance;
@@ -749,14 +741,14 @@ void b2DynamicTree::RebuildBottomUp()
 		int32 iMin = -1, jMin = -1;
 		for (int32 i = 0; i < count; ++i)
 		{
-			b2AABB aabbi = m_nodes[nodes[i]].aabb;
+			Rectf aabbi = m_nodes[nodes[i]].aabb;
 
 			for (int32 j = i + 1; j < count; ++j)
 			{
-				b2AABB aabbj = m_nodes[nodes[j]].aabb;
-				b2AABB b;
-				b.Combine(aabbi, aabbj);
-				float cost = b.GetPerimeter();
+				Rectf aabbj = m_nodes[nodes[j]].aabb;
+				Rectf b;
+				b.combine(aabbi, aabbj);
+				float cost = b.get_perimeter();
 				if (cost < minCost)
 				{
 					iMin = i;
@@ -775,8 +767,8 @@ void b2DynamicTree::RebuildBottomUp()
 		b2TreeNode* parent = m_nodes + parentIndex;
 		parent->child1 = index1;
 		parent->child2 = index2;
-		parent->height = 1 + b2Max(child1->height, child2->height);
-		parent->aabb.Combine(child1->aabb, child2->aabb);
+		parent->height = 1 + std::max(child1->height, child2->height);
+		parent->aabb.combine(child1->aabb, child2->aabb);
 		parent->parent = b2_nullNode;
 
 		child1->parent = parentIndex;
@@ -793,12 +785,11 @@ void b2DynamicTree::RebuildBottomUp()
 	Validate();
 }
 
-void b2DynamicTree::ShiftOrigin(const b2Vec2& newOrigin)
+void b2DynamicTree::ShiftOrigin(const Vector& newOrigin)
 {
 	// Build array of leaves. Free the rest.
 	for (int32 i = 0; i < m_nodeCapacity; ++i)
 	{
-		m_nodes[i].aabb.lowerBound -= newOrigin;
-		m_nodes[i].aabb.upperBound -= newOrigin;
+		m_nodes[i].aabb.move(-newOrigin);
 	}
 }

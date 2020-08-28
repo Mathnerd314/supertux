@@ -42,7 +42,7 @@ b2BroadPhase::~b2BroadPhase()
 	b2Free(m_pairBuffer);
 }
 
-int32 b2BroadPhase::CreateProxy(const b2AABB& aabb, void* userData)
+int32 b2BroadPhase::CreateProxy(const Rectf& aabb, void* userData)
 {
 	int32 proxyId = m_tree.CreateProxy(aabb, userData);
 	++m_proxyCount;
@@ -57,7 +57,7 @@ void b2BroadPhase::DestroyProxy(int32 proxyId)
 	m_tree.DestroyProxy(proxyId);
 }
 
-void b2BroadPhase::MoveProxy(int32 proxyId, const b2AABB& aabb, const b2Vec2& displacement)
+void b2BroadPhase::MoveProxy(int32 proxyId, const Rectf& aabb, const Vector& displacement)
 {
 	bool buffer = m_tree.MoveProxy(proxyId, aabb, displacement);
 	if (buffer)
@@ -124,7 +124,7 @@ bool b2BroadPhase::QueryCallback(int32 proxyId)
 	}
 
 	m_pairBuffer[m_pairCount].proxyIdA = b2Min(proxyId, m_queryProxyId);
-	m_pairBuffer[m_pairCount].proxyIdB = b2Max(proxyId, m_queryProxyId);
+	m_pairBuffer[m_pairCount].proxyIdB = std::max(proxyId, m_queryProxyId);
 	++m_pairCount;
 
 	return true;

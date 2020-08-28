@@ -85,6 +85,7 @@ public:
 
   float get_width() const { return m_size.width; }
   float get_height() const { return m_size.height; }
+  float get_perimeter() const { return 2.0f * (m_size.width + m_size.height); }
 
   void set_left(float v) { m_size.width -= v - m_p1.x; m_p1.x = v; }
   void set_right(float v) { m_size.width += v - get_right(); }
@@ -101,6 +102,8 @@ public:
   void set_height(float height) { m_size.height = height; }
   void set_size(float width, float height) { m_size = Sizef(width, height); }
   Sizef get_size() const { return m_size; }
+  Vector get_extents() const { return Vector(m_size.width / 2.0f,
+                                             m_size.height / 2.0f); }
 
   void move(const Vector& v) { m_p1 += v; }
   Rectf moved(const Vector& v) const { return Rectf(m_p1 + v, m_size); }
@@ -109,15 +112,30 @@ public:
     return v.x >= m_p1.x && v.y >= m_p1.y && v.x < get_right() && v.y < get_bottom();
   }
 
-  bool contains(const Rectf& other) const
+  bool overlaps(const Rectf& other) const
   {
-    // FIXME: This is overlaps(), not contains()!
     if (m_p1.x >= other.get_right() || other.get_left() >= get_right())
       return false;
     if (m_p1.y >= other.get_bottom() || other.get_top() >= get_bottom())
       return false;
 
     return true;
+  }
+
+  bool contains(const Rectf& other) const
+  {
+    return get_left() <= other.get_left()
+      && get_top() <= other.get_top()
+      && get_right() >= other.get_right()
+      && get_bottom() >= other.get_bottom();
+  }
+
+  void combine(const Rectf& r1, const Rectf& r2)
+  {
+    m_p1.x = std::min(r1.m_p1.x, r2.m_p2.x);
+    m_p1.y = std::min(r1.m_p1.y, r2.m_p2.y);
+    m_size.width = std::max(r1.get_right(), r2.get_right()) - m_p1.x;
+    m_size.height = std::max(r1.get_bottom(), r2.get_bottom()) - m_p1.y;
   }
 
   float distance (const Vector& other, AnchorPoint ap = ANCHOR_MIDDLE) const

@@ -50,20 +50,20 @@ public:
 
 	/// Create a proxy with an initial AABB. Pairs are not reported until
 	/// UpdatePairs is called.
-	int32 CreateProxy(const b2AABB& aabb, void* userData);
+	int32 CreateProxy(const Rectf& aabb, void* userData);
 
 	/// Destroy a proxy. It is up to the client to remove any pairs.
 	void DestroyProxy(int32 proxyId);
 
 	/// Call MoveProxy as many times as you like, then when you are done
 	/// call UpdatePairs to finalized the proxy pairs (for your time step).
-	void MoveProxy(int32 proxyId, const b2AABB& aabb, const b2Vec2& displacement);
+	void MoveProxy(int32 proxyId, const Rectf& aabb, const Vector& displacement);
 
 	/// Call to trigger a re-processing of it's pairs on the next call to UpdatePairs.
 	void TouchProxy(int32 proxyId);
 
 	/// Get the fat AABB for a proxy.
-	const b2AABB& GetFatAABB(int32 proxyId) const;
+	const Rectf& GetFatAABB(int32 proxyId) const;
 
 	/// Get user data from a proxy. Returns nullptr if the id is invalid.
 	void* GetUserData(int32 proxyId) const;
@@ -81,7 +81,7 @@ public:
 	/// Query an AABB for overlapping proxies. The callback class
 	/// is called for each proxy that overlaps the supplied AABB.
 	template <typename T>
-	void Query(T* callback, const b2AABB& aabb) const;
+	void Query(T* callback, const Rectf& aabb) const;
 
 	/// Ray-cast against the proxies in the tree. This relies on the callback
 	/// to perform a exact ray-cast in the case were the proxy contains a shape.
@@ -105,7 +105,7 @@ public:
 	/// Shift the world origin. Useful for large worlds.
 	/// The shift formula is: position -= newOrigin
 	/// @param newOrigin the new origin with respect to the old origin
-	void ShiftOrigin(const b2Vec2& newOrigin);
+	void ShiftOrigin(const Vector& newOrigin);
 
 private:
 
@@ -138,12 +138,12 @@ inline void* b2BroadPhase::GetUserData(int32 proxyId) const
 
 inline bool b2BroadPhase::TestOverlap(int32 proxyIdA, int32 proxyIdB) const
 {
-	const b2AABB& aabbA = m_tree.GetFatAABB(proxyIdA);
-	const b2AABB& aabbB = m_tree.GetFatAABB(proxyIdB);
-	return b2TestOverlap(aabbA, aabbB);
+	const Rectf& aabbA = m_tree.GetFatAABB(proxyIdA);
+	const Rectf& aabbB = m_tree.GetFatAABB(proxyIdB);
+	return aabbA.overlaps(aabbB);
 }
 
-inline const b2AABB& b2BroadPhase::GetFatAABB(int32 proxyId) const
+inline const Rectf& b2BroadPhase::GetFatAABB(int32 proxyId) const
 {
 	return m_tree.GetFatAABB(proxyId);
 }
@@ -185,7 +185,7 @@ void b2BroadPhase::UpdatePairs(T* callback)
 
 		// We have to query the tree with the fat AABB so that
 		// we don't fail to create a pair that may touch later.
-		const b2AABB& fatAABB = m_tree.GetFatAABB(m_queryProxyId);
+		const Rectf& fatAABB = m_tree.GetFatAABB(m_queryProxyId);
 
 		// Query tree, create pairs and add them pair buffer.
 		m_tree.Query(this, fatAABB);
@@ -218,7 +218,7 @@ void b2BroadPhase::UpdatePairs(T* callback)
 }
 
 template <typename T>
-inline void b2BroadPhase::Query(T* callback, const b2AABB& aabb) const
+inline void b2BroadPhase::Query(T* callback, const Rectf& aabb) const
 {
 	m_tree.Query(callback, aabb);
 }
@@ -229,7 +229,7 @@ inline void b2BroadPhase::RayCast(T* callback, const b2RayCastInput& input) cons
 	m_tree.RayCast(callback, input);
 }
 
-inline void b2BroadPhase::ShiftOrigin(const b2Vec2& newOrigin)
+inline void b2BroadPhase::ShiftOrigin(const Vector& newOrigin)
 {
 	m_tree.ShiftOrigin(newOrigin);
 }

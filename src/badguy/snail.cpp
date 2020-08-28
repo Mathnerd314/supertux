@@ -117,7 +117,7 @@ Snail::is_in_danger()
 {
   Rectf sense_zone = get_bbox().moved(Vector(0, -DANGER_SENSE_DIST));
   auto player = Sector::get().get_nearest_player(get_bbox());
-  if (player && sense_zone.contains(player->get_bbox()) && player->get_velocity().y > 0)
+  if (player && sense_zone.overlaps(player->get_bbox()) && player->get_velocity().y > 0)
   {
     return true;
   }
@@ -129,7 +129,7 @@ Snail::active_update(float dt_sec)
 {
   if (state == STATE_GRABBED)
     return;
-  
+
   if (m_frozen)
   {
     BadGuy::active_update(dt_sec);

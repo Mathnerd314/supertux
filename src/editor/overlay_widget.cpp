@@ -459,6 +459,7 @@ EditorOverlayWidget::rubber_rect()
   Rectf dr = drag_rect();
   for (auto& moving_object : m_editor.get_sector()->get_objects_by_type<MovingObject>()) {
     Rectf bbox = moving_object.get_bbox();
+    // NB: could also be overlaps(). But contains() is more precise.
     if (dr.contains(bbox)) {
       moving_object.editor_delete();
     }
@@ -831,7 +832,7 @@ EditorOverlayWidget::draw_tile_grid(DrawingContext& context, const Color& line_c
   auto current_tm = m_editor.get_selected_tilemap();
   if (current_tm == nullptr)
     return;
- 
+
   int tm_width = current_tm->get_width() * (32 / tile_size);
   int tm_height = current_tm->get_height() * (32 / tile_size);
   auto cam_translation = m_editor.get_sector()->get_camera().get_translation();
