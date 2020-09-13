@@ -25,8 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include "discord_rpc.h"
-
+#include <discord_rpc.h>
 
 #include "supertux/gameconfig.hpp"
 #include "supertux/globals.hpp"
@@ -65,14 +64,14 @@ extern "C" {
   static void handleDiscordJoinRequest(const DiscordUser* request)
   {
       int response = -1;
-      
+
       printf("\nDiscord: join request from %s#%s - %s\n",
              request->username,
              request->discriminator,
              request->userId);
-      
+
       response = false ? DISCORD_REPLY_YES : DISCORD_REPLY_NO;
-      
+
       if (response != -1) {
           Discord_Respond(request->userId, response);
       }

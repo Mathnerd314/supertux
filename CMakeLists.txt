@@ -169,20 +169,12 @@ else(WIN32)
 endif(WIN32)
 set(HAVE_SDL TRUE)
 
-option(DISABLE_DISCORD "Do not compile the Discord integration" OFF)
 option(IS_SUPERTUX_RELEASE "Build as official SuperTux release" OFF)
 option(BUILD_TESTS "Build test cases" OFF)
 option(ENABLE_OPENGL "Enable OpenGL support" ON)
 option(ENABLE_OPENGLES2 "Enable OpenGLES2 support" OFF)
 option(GLBINDING_ENABLED "Use glbinding instead of GLEW" OFF)
 option(GLBINDING_DEBUG_OUTPUT "Enable glbinding debug output for each called OpenGL function" OFF)
-
-if(DISABLE_DISCORD)
-  message(STATUS "WARNING : Discord is NOT to be compiled. To enable Discord, pass -DDISABLE_DISCORD=Off")
-else(DISABLE_DISCORD)
-  set(ENABLE_DISCORD TRUE)
-  message(STATUS "Discord WILL be compiled. To disable Discord, pass -DDISABLE_DISCORD=On")
-endif(DISABLE_DISCORD)
 
 if(ENABLE_OPENGL)
   if(ENABLE_OPENGLES2)
@@ -506,6 +498,15 @@ if(RAQM_FOUND)
   set_target_properties(SDL_ttf_lib PROPERTIES INTERFACE_LINK_LIBRARIES "${RAQM_LIBRARIES}")
 endif()
 
+## Add discord RPC
+
+option(ENABLE_DISCORD "Compile the Discord integration" ON)
+
+if(ENABLE_DISCORD)
+include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/external/discord-sdk/include)
+add_subdirectory(external/discord-sdk)
+endif(ENABLE_DISCORD)
+
 ## Some additional include paths
 
 include_directories(${CMAKE_BINARY_DIR}/)
@@ -514,9 +515,6 @@ include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/external/findlocale/)
 include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/external/obstack/)
 include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/external/sexp-cpp/include/)
 include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/external/SDL_SavePNG/)
-if(NOT DISABLE_DISCORD)
-include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/external/discord-sdk/include)
-endif(NOT DISABLE_DISCORD)
 
 if(WIN32)
   add_definitions(-D_USE_MATH_DEFINES -DNOMINMAX)
@@ -574,12 +572,6 @@ list(SORT SUPERTUX_RESOURCES)
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/wrapper.cpp)
   set(SUPERTUX_SOURCES_CXX ${SUPERTUX_SOURCES_CXX} ${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/wrapper.cpp)
 endif(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/wrapper.cpp)
-
-## Add discord RPC
-
-if(NOT DISABLE_DISCORD)
-add_subdirectory(external/discord-sdk)
-endif(NOT DISABLE_DISCORD)
 
 ## Compile everything at once (roughly equivalent to cat *.cpp | gcc)
 
@@ -842,9 +834,9 @@ target_link_libraries(supertux2_lib PUBLIC sqstdlib_lib)
 target_link_libraries(supertux2_lib PUBLIC tinygettext_lib)
 target_link_libraries(supertux2_lib PUBLIC sexp)
 target_link_libraries(supertux2_lib PUBLIC savepng)
-if(NOT DISABLE_DISCORD)
+if(ENABLE_DISCORD)
 target_link_libraries(supertux2_lib PUBLIC discord-rpc)
-endif(NOT DISABLE_DISCORD)
+endif(ENABLE_DISCORD)
 if(VCPKG_BUILD)
   target_link_libraries(supertux2_lib PUBLIC OpenAL::OpenAL)
 else()
@@ -1145,8 +1137,7 @@ mark_as_advanced(
 mark_as_advanced(
   OPENAL_INCLUDE_DIR
   OPENAL_LIBRARY
-)
-
+  )
 mark_as_advanced(
   SDL2TTF_INCLUDE_DIRS
   SDL2TTF_LIBRARIES
