@@ -26,12 +26,47 @@
 namespace {
 const float PUFF_INTERVAL_MIN = 4.0f; /**< spawn new puff of smoke at most that often */
 const float PUFF_INTERVAL_MAX = 8.0f; /**< spawn new puff of smoke at least that often */
-const float GLOBAL_SPEED_MULT = 0.8f; /**< the overall movement speed/rate */
+
+const float FLY_HEIGHT = 96.0f; // 4 * 32 / (4/3)
+// in milestone1: it goes up for 1s at speed 100 px/s, then down similarly, so total travel was 100px.
+// in 0.3.x the travel was changed to 4*32 + extra. The extra was usually around half a tile or less
+// but there was a random boost that could make the snowball fly up an extra tile or two
+// here we use exactly 4*32=128 so that level design is easier
+// our chosen function height height has range [-2/3,2/3] hence 4/3
+
+const float GLOBAL_SPEED_MULT = 0.883883476483184f; /**< the overall movement speed multiplier k, f(k*t) */
+// we can look at this 3 ways:
+// 1. position - the time to get from bottom to top
+// - pi in total, but 1.91 if we exclude the direction reversal
+// to scale this to 1s we would use k = pi or k = 1.91
+// 2. velocity - our function's max speed is 0.968 and avg speed is 0.518, unscaled
+// we scale like FLY_HEIGHT * k * unscaled speed = scaled speed
+// so to get 100px/s speed like milestone1 we would use mult = 1.0764359221215134 (max) or 2.0081203041412046 (avg)
+// 3. acceleration - it was gravity * 0.2 at the extremes, in 0.3.x. gravity is 10 but scaled to 1000, so a=200
+// we scale like FLY_HEIGHT * k^2 * unscaled accel = scaled accel
+// our function has max acceleration 8/3 unscaled. So we use mult = 0.883883476483184
+
+const float OFFSET_MULT = -1.0f / (2.f * 32.f * math::TAU);
+// Tux travels right at 320 px/s running / 400 px/s air
+// his jump follows v t + .5 a t (t+dt_sec)
+// v is 620 (air) or 580 (run), a is -1000
+// air we hit at th=1.224375, run we hit at th=1.144375
+// so jump length is jx=489.75px air, jx=366.2px run
+// we want each of Tux's jumps to be at the same height.
+// so one of the maxima of our function at t = th*k should be within +- 32px of x= jx * k
+
+// we work with cos(o*(jx*k+f)+g*(th*k)). the cos is so the maximum is at 0
+// the f is the 32px fudge factor. the k can be factored out, o*f+(o*jx+g*th)*k
+// we need integer values of k to be maxima, so o*jx+g*th = 2*pi*m for integer m
+// to be continued...
 }
+
+
+
 
 FlyingSnowBall::FlyingSnowBall(const ReaderMapping& reader) :
   BadGuy(reader, "images/creatures/flying_snowball/flying_snowball.sprite"),
-  total_time_elapsed(),
+  start_time(g_game_time),
   puff_timer()
 {
   m_physic.enable_gravity(false);
@@ -71,20 +106,14 @@ FlyingSnowBall::collision_solid(const CollisionHit& hit)
 void
 FlyingSnowBall::active_update(float dt_sec)
 {
-  total_time_elapsed = fmodf(total_time_elapsed + dt_sec, math::TAU / GLOBAL_SPEED_MULT);
-
-  float delta = total_time_elapsed * GLOBAL_SPEED_MULT;
-
-  // Put that function in a graphing calculator :
-  // sin(x)^3 + sin(3(x - pi/3))/3
-  float targetHgt = std::pow(std::sin(delta), 3.f) +
-                    std::sin(3.f *
-                             ((delta - math::PI) / 3.f)
-                            ) / 3.f;
-  targetHgt = targetHgt * 100.f + m_start_position.y;
-  m_physic.set_velocity_y(targetHgt - get_pos().y);
-
-  m_col.m_movement=m_physic.get_movement(1.f);
+  float t = GLOBAL_SPEED_MULT * (g_game_time - start_time);
+  float x = OFFSET_MULT * m_start_position.x;
+  // sum-expanded version of sin(t+x)
+  float s = sinf(t) * cosf(x) + cosf(t) * sin(x);
+  // graph sin(x)^3 - sin(x)/3 -- it is a wavy curve
+  float targetHgt = std::pow(s, 3.f) - s / 3.f;
+  targetHgt = targetHgt * FLY_HEIGHT + m_start_position.y;
+  m_col.m_movement = Vector(0, targetHgt - get_pos().y);
 
   auto player = get_nearest_player();
   if (player) {
@@ -103,7 +132,7 @@ FlyingSnowBall::active_update(float dt_sec)
                                            LAYER_OBJECTS-1);
     puff_timer.start(gameRandom.randf(PUFF_INTERVAL_MIN, PUFF_INTERVAL_MAX));
   }
-  
+
 }
 
 /* EOF */
